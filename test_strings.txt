@@ -1,0 +1,11 @@
+[16:09:52] [Server thread/INFO]: Burrito_Bandit28 joined the game
+[16:10:35] [Server thread/INFO]: Burrito_Bandit28 has made the advancement [Monster Hunter]
+[16:10:58] [Server thread/INFO]: Burrito_Bandit28 has completed the challenge [Hot Tourist Destinations]
+[16:12:41] [Server thread/INFO]: Burrito_Bandit28 tried to swim in lava
+[16:12:43] [Server thread/WARN]: Burrito_Bandit28 moved too quickly! 15.064882966423745,2.0,-7.121905179601766
+[16:13:35] [Server thread/INFO]: <Burrito_Bandit28> hellow world
+[16:13:06] [Server thread/INFO]: Burrito_Bandit28 left the game
+[16:31:03] [Server thread/INFO]: <Burrito_Bandit28> challenge
+[16:31:07] [Server thread/INFO]: [Burrito_Bandit28] challenge
+[16:34:15] [Server thread/INFO]: Burrito_Bandit28 was killed by [Intentional Game Design]
+
