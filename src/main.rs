@@ -1,5 +1,6 @@
 mod discord;
 mod minecraft;
+mod util;
 
 use crate::discord::channel_id_val;
 use crate::minecraft::{chat_send_queue, start_server};
@@ -41,19 +42,6 @@ async fn handle_console_input() {
     }
 }
 
-fn get_dir_char() -> char {
-    if env::consts::OS.eq("windows") {
-        return '\\';
-    }
-    '/'
-}
-fn get_chain_char() -> char {
-    if env::consts::OS.eq("windows") {
-        return '&';
-    }
-    ';'
-}
-
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -79,7 +67,7 @@ async fn main() {
 
     let http = Arc::clone(&client.http);
 
-    let mut argument_as_vec = args[1].split(get_dir_char()).collect::<Vec<&str>>();
+    let mut argument_as_vec = args[1].split(util::get_dir_char()).collect::<Vec<&str>>();
     let minecraft_server_launch_command = /*&args[2];*/ <&str>::clone(argument_as_vec.last().unwrap());
     argument_as_vec.remove(argument_as_vec.len() - 1);
     let minecraft_server_directory = /*args[1].split(get_dir_char()).collect::<Vec<&str>>().join("/");*/ argument_as_vec.join("/");

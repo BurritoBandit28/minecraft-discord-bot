@@ -4,29 +4,13 @@ use serenity::all::{
     ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor, CreateMessage, EventHandler, Http,
     Message, Ready,
 };
+use crate::util::GetSetWrapper;
 use serenity::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 lazy_static! {
     pub static ref channel_id_val: Mutex<GetSetWrapper<u64>> = Mutex::new(GetSetWrapper::new());
-}
-
-pub struct GetSetWrapper<T : Clone + Default> {
-    val: T,
-}
-
-impl<T : Clone+ Default> GetSetWrapper<T> {
-    pub fn set(&mut self, val: T) {
-        self.val = val;
-    }
-    pub fn get(&self) -> T {
-        self.val.clone()
-    }
-
-    pub fn new() -> Self {
-        Self { val: T::default() }
-    }
 }
 
 pub async fn send_minecraft_embed(http: &Arc<Http>, message: ChatMessage) {

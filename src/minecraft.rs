@@ -1,14 +1,14 @@
+use crate::util::GetSetWrapper;
 use crate::discord;
 use lazy_static::lazy_static;
-use regex::{regex, Regex};
+use regex::Regex;
 use serenity::all::Http;
 use std::sync::Arc;
+use std::sync::Mutex as VMutex;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as TokioBufReader};
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::Mutex;
-use std::sync::Mutex as VMutex;
-use crate::discord::GetSetWrapper;
 
 // maybe you can tell, but I use a mutex too much
 lazy_static! {
