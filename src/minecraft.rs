@@ -86,7 +86,7 @@ impl LogParser {
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s([A-Za-z-0-9_\-]+) left the game")
                 .unwrap();
         let death =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\](.+|):\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
         let start_logging_indicator =
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\sDone.+! For help, type").unwrap();
         let server_stop = Regex::new(
@@ -185,12 +185,12 @@ impl LogParser {
             && log.get()
             && !&caps[1].contains(":")
         {
-            let player_name = String::from(&caps[2]);
+            let player_name = String::from(&caps[3]);
             let mut player_set = self.connected_players.lock().unwrap();
             if player_set.contains(&player_name) {
                 return Some(ChatMessage {
                     message_type: MessageType::DEATH,
-                    message_text: caps[1].to_string(),
+                    message_text: caps[2].to_string(),
                     player_name,
                 });
             }
