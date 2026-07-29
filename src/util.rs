@@ -1,11 +1,11 @@
 use std::env;
 use std::ops::{Add, AddAssign, DivAssign, Mul, MulAssign, SubAssign};
 
-pub struct GetSetWrapper<T : Clone + Default> {
+pub struct GetSetWrapper<T: Clone + Default> {
     val: T,
 }
 
-impl<T : Clone+ Default> GetSetWrapper<T> {
+impl<T: Clone + Default> GetSetWrapper<T> {
     pub fn set(&mut self, val: T) {
         self.val = val;
     }
@@ -18,20 +18,20 @@ impl<T : Clone+ Default> GetSetWrapper<T> {
     }
 }
 
-impl <T: MulAssign + Clone + Default + AddAssign + DivAssign + SubAssign> GetSetWrapper<T> {
-    pub fn add(&mut self, other : T) {
+impl<T: MulAssign + Clone + Default + AddAssign + DivAssign + SubAssign> GetSetWrapper<T> {
+    pub fn add(&mut self, other: T) {
         self.val += other;
     }
 
-    pub fn mul(&mut self, other : T) {
+    pub fn mul(&mut self, other: T) {
         self.val *= other;
     }
 
-    pub fn div(&mut self, other : T) {
+    pub fn div(&mut self, other: T) {
         self.val /= other;
     }
 
-    pub fn sub(&mut self, other : T) {
+    pub fn sub(&mut self, other: T) {
         self.val -= other;
     }
 }

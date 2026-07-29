@@ -1,5 +1,5 @@
-use crate::util::GetSetWrapper;
 use crate::discord;
+use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::all::Http;
@@ -25,7 +25,7 @@ pub struct LogParser {
     challenge_regex: Regex,
     death_regex: Regex,
     server_started: Regex,
-    server_stopping: Regex
+    server_stopping: Regex,
 }
 
 #[derive(Clone, Debug)]
@@ -77,13 +77,21 @@ impl LogParser {
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s*\<([A-Za-z-0-9_\-]+).*challenge ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
         let advancement =
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s*\<([A-Za-z-0-9_\-]+).*advancement ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
-        let joined_game =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) joined the game").unwrap();
+        let joined_game = Regex::new(
+            r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) joined the game",
+        )
+        .unwrap();
         let left_the_game =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) left the game").unwrap();
-        let death = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
-        let start_logging_indicator = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\sDone.+! For help, type").unwrap();
-        let server_stop = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]: (Stopping server|Stopping the server)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) left the game")
+                .unwrap();
+        let death =
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
+        let start_logging_indicator =
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\sDone.+! For help, type").unwrap();
+        let server_stop = Regex::new(
+            r"^\[[^\]]+\]\s*\[Server thread/INFO\]: (Stopping server|Stopping the server)",
+        )
+        .unwrap();
 
         Self {
             chat_regex: chat,
@@ -93,28 +101,32 @@ impl LogParser {
             challenge_regex: challenge,
             death_regex: death,
             server_started: start_logging_indicator,
-            server_stopping: server_stop
+            server_stopping: server_stop,
         }
     }
 
     // This function will be used for parsing other events, right now its just for chat messages
     pub fn try_parse_line(&self, line: String) -> Option<ChatMessage> {
         let mut log = start_logging.lock().unwrap();
-        if !log.get() && let Some(caps) = self.server_started.captures(&line) {
+        if !log.get()
+            && let Some(caps) = self.server_started.captures(&line)
+        {
             log.set(true);
             return Some(ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: "Server Started".to_string(),
                 player_name: "MHF_Grass".to_string(),
-            })
+            });
         }
-        if log.get() && let Some(caps) = self.server_stopping.captures(&line) {
+        if log.get()
+            && let Some(caps) = self.server_stopping.captures(&line)
+        {
             log.set(false);
             return Some(ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: "Server Stopped".to_string(),
-                player_name: "MHF_Grass".to_string()
-            })
+                player_name: "MHF_Grass".to_string(),
+            });
         }
         if let Some(caps) = self.chat_regex.captures(&line) {
             if line
@@ -135,46 +147,44 @@ impl LogParser {
                 message_text,
                 player_name,
             });
-        }
-        else if let Some(caps) = self.joined_regex.captures(&line)  {
+        } else if let Some(caps) = self.joined_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             return Some(ChatMessage {
                 message_type: MessageType::JOIN,
-                message_text: format!("{} joined the game",player_name),
+                message_text: format!("{} joined the game", player_name),
                 player_name,
-            })
-        }
-        else if let Some(caps) = self.left_regex.captures(&line) {
+            });
+        } else if let Some(caps) = self.left_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             return Some(ChatMessage {
                 message_type: MessageType::LEAVE,
-                message_text: format!("{} left the game",player_name),
+                message_text: format!("{} left the game", player_name),
                 player_name,
-            })
-        }
-        else if let Some(caps) = self.advancement_regex.captures(&line) {
+            });
+        } else if let Some(caps) = self.advancement_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             return Some(ChatMessage {
                 message_type: MessageType::ADVANCEMENT,
-                message_text: format!("{} has made the advancement {}",player_name, &caps[2]),
+                message_text: format!("{} has made the advancement {}", player_name, &caps[2]),
                 player_name,
-            })
-        }
-        else if let Some(caps) = self.challenge_regex.captures(&line) {
+            });
+        } else if let Some(caps) = self.challenge_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             return Some(ChatMessage {
                 message_type: MessageType::CHALLENGE,
-                message_text: format!("{} has completed the challenge {}",player_name, &caps[2]),
+                message_text: format!("{} has completed the challenge {}", player_name, &caps[2]),
                 player_name,
-            })
-        }
-        else if let Some(caps) = self.death_regex.captures(&line) && log.get() && !&caps[1].contains(":") {
+            });
+        } else if let Some(caps) = self.death_regex.captures(&line)
+            && log.get()
+            && !&caps[1].contains(":")
+        {
             let player_name = String::from(&caps[2]);
             return Some(ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: caps[1].to_string(),
                 player_name,
-            })
+            });
         }
         None
     }

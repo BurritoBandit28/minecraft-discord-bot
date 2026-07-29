@@ -1,10 +1,10 @@
 use crate::minecraft::{ChatMessage, MessageType, chat_send_queue};
+use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
 use serenity::all::{
     ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor, CreateMessage, EventHandler, Http,
     Message, Ready,
 };
-use crate::util::GetSetWrapper;
 use serenity::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -20,8 +20,6 @@ pub async fn send_minecraft_embed(http: &Arc<Http>, message: ChatMessage) {
         "https://mc-api.io/render/face/{}/java",
         message.get_player()
     ));
-
-
 
     // base chat colour is discord blurple, all other colours keep the same vibrance with different hues
     // I may adjust saturation
@@ -52,7 +50,6 @@ pub async fn send_minecraft_embed(http: &Arc<Http>, message: ChatMessage) {
     }
 
     embed = embed.author(embed_author);
-
 
     // Create the message builder and add the embed
     let builder = CreateMessage::new().embed(embed);
