@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use crate::discord;
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
@@ -26,6 +27,7 @@ pub struct LogParser {
     death_regex: Regex,
     server_started: Regex,
     server_stopping: Regex,
+    connected_players: VMutex<HashSet<String>>
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +47,6 @@ pub struct ChatMessage {
     player_name: String,
 }
 
-static mut START_LOGGING: bool = false;
 impl ChatMessage {
     pub fn get_player(&self) -> String {
         self.player_name.clone()
@@ -72,24 +73,24 @@ impl LogParser {
         // maybe this is too much
 
         //idk
-        let chat = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s*<([^>]+)> (.+)").unwrap();
+        let chat = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*<([^>]+)> (.+)").unwrap();
         let challenge =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s*\<([A-Za-z-0-9_\-]+).*challenge ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*challenge ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
         let advancement =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s*\<([A-Za-z-0-9_\-]+).*advancement ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*advancement ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
         let joined_game = Regex::new(
-            r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) joined the game",
+            r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s([A-Za-z-0-9_\-]+) joined the game",
         )
         .unwrap();
         let left_the_game =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s([A-Za-z-0-9_\-]+) left the game")
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s([A-Za-z-0-9_\-]+) left the game")
                 .unwrap();
         let death =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
         let start_logging_indicator =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\]:\sDone.+! For help, type").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\sDone.+! For help, type").unwrap();
         let server_stop = Regex::new(
-            r"^\[[^\]]+\]\s*\[Server thread/INFO\]: (Stopping server|Stopping the server)",
+            r"^\[[^\]]+\]\s*\[Server thread/INFO\].+ (Stopping server|Stopping the server)",
         )
         .unwrap();
 
@@ -102,6 +103,7 @@ impl LogParser {
             death_regex: death,
             server_started: start_logging_indicator,
             server_stopping: server_stop,
+            connected_players : VMutex::new(HashSet::new())
         }
     }
 
@@ -149,6 +151,8 @@ impl LogParser {
             });
         } else if let Some(caps) = self.joined_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
+            let mut player_set = self.connected_players.lock().unwrap();
+            player_set.insert(player_name.clone());
             return Some(ChatMessage {
                 message_type: MessageType::JOIN,
                 message_text: format!("{} joined the game", player_name),
@@ -156,6 +160,8 @@ impl LogParser {
             });
         } else if let Some(caps) = self.left_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
+            let mut player_set = self.connected_players.lock().unwrap();
+            player_set.remove(&player_name.clone());
             return Some(ChatMessage {
                 message_type: MessageType::LEAVE,
                 message_text: format!("{} left the game", player_name),
@@ -180,11 +186,14 @@ impl LogParser {
             && !&caps[1].contains(":")
         {
             let player_name = String::from(&caps[2]);
-            return Some(ChatMessage {
-                message_type: MessageType::DEATH,
-                message_text: caps[1].to_string(),
-                player_name,
-            });
+            let mut player_set = self.connected_players.lock().unwrap();
+            if player_set.contains(&player_name) {
+                return Some(ChatMessage {
+                    message_type: MessageType::DEATH,
+                    message_text: caps[1].to_string(),
+                    player_name,
+                });
+            }
         }
         None
     }

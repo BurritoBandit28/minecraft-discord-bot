@@ -81,7 +81,8 @@ async fn main() {
         command = Command::new("cmd");
         command.args(["/C", &format!("{}", minecraft_server_launch_command)]);
     } else {
-        command = Command::new(minecraft_server_launch_command);
+        command = Command::new("sh");
+        command.args([minecraft_server_launch_command]);
     }
     command.current_dir(&minecraft_server_directory);
     command.stdout(Stdio::piped());
