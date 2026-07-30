@@ -1,15 +1,12 @@
 use crate::minecraft::{ChatMessage, MessageType, chat_send_queue, connected_player_count};
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
-use serenity::all::ActivityType::Playing;
 use serenity::all::{
-    ActivityData, ActivityType, ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor,
-    CreateMessage, EventHandler, Http, Message, OnlineStatus, Ready,
+    ActivityData, ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor,
+    CreateMessage, EventHandler, Http, Message, Ready,
 };
 use serenity::async_trait;
-use serenity::gateway::ShardMessenger;
 use std::sync::Arc;
-use tokio::net::windows::named_pipe::PipeEnd::Server;
 use tokio::sync::Mutex;
 
 lazy_static! {
