@@ -8,20 +8,24 @@ use discord::MessageHandler;
 use dotenv::dotenv;
 use serenity::Client;
 use serenity::all::{EventHandler, GatewayIntents};
-use std::env;
 use std::io::{BufRead, Read, Write};
 use std::ops::Deref;
-use std::process::Stdio;
+use std::process::{Stdio, exit};
 use std::sync::Arc;
+use std::{env, thread};
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader as TokioBufReader};
 use tokio::join;
 use tokio::process::Command;
+use tokio_util::sync::CancellationToken;
 
-async fn handle_console_input() {
+async fn handle_console_input(token: CancellationToken) {
     let stdin = io::stdin();
     let mut reader = TokioBufReader::new(stdin);
 
-    loop {
+    'detection_loop: loop {
+        if token.is_cancelled() {
+            break 'detection_loop;
+        }
         let mut buf = String::new();
 
         match reader.read_line(&mut buf).await {
@@ -88,9 +92,23 @@ async fn main() {
     command.stdout(Stdio::piped());
     command.stdin(Stdio::piped());
 
-    let (result_one, result_two, result_three) = join!(
-        start_server(&mut command, &http),
-        client.start(),
-        handle_console_input()
+    let token = CancellationToken::new();
+
+    let read_input_handle = tokio::spawn(handle_console_input(token.clone()));
+
+    let shard_manager = client.shard_manager.clone();
+
+    let (server_exit_status, _) = join!(
+        start_server(&mut command, &http, shard_manager),
+        client.start()
     );
+
+    if server_exit_status.is_ok() {
+        println!("Server Stopped Successfully");
+    } else {
+        println!("Server Stopped Unsuccessfully");
+    }
+    println!("press enter to close");
+    token.cancel();
+    read_input_handle.await.unwrap();
 }

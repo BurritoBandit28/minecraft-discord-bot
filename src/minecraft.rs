@@ -1,13 +1,14 @@
-use std::collections::{HashMap, HashSet};
 use crate::discord;
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serenity::all::{Http, ShardManager};
+use serenity::gateway::ShardMessenger;
+use std::collections::{HashMap, HashSet};
+use std::process::ExitStatus;
 use std::sync::Arc;
 use std::sync::Mutex as VMutex;
 use std::time::Duration;
-use serenity::gateway::ShardMessenger;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as TokioBufReader};
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::Mutex;
@@ -17,7 +18,8 @@ lazy_static! {
     pub static ref INSTANCE: LogParser = LogParser::new();
     pub static ref chat_send_queue: Mutex<Vec<String>> = Mutex::new(vec![]);
     pub static ref start_logging: VMutex<GetSetWrapper<bool>> = VMutex::new(GetSetWrapper::new());
-    pub static ref connected_player_count : VMutex<GetSetWrapper<i32>> = VMutex::new(GetSetWrapper::new());
+    pub static ref connected_player_count: VMutex<GetSetWrapper<i32>> =
+        VMutex::new(GetSetWrapper::new());
 }
 
 pub struct LogParser {
@@ -29,7 +31,7 @@ pub struct LogParser {
     death_regex: Regex,
     server_started: Regex,
     server_stopping: Regex,
-    connected_players: VMutex<HashSet<String>>
+    connected_players: VMutex<HashSet<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -62,7 +64,6 @@ impl ChatMessage {
 }
 
 impl LogParser {
-
     fn new() -> Self {
         // old regex \[[0-9:]+\] \[[A-Za-z0-9/_\- ]+\]: <[A-Za-z0-9_-]+>
 
@@ -84,7 +85,8 @@ impl LogParser {
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s([A-Za-z-0-9_\-]+) left the game")
                 .unwrap();
         let death =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\](.+|):\s(\<([A-Za-z-0-9_\-]+).*)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\](.+|):\s(\<([A-Za-z-0-9_\-]+).*)")
+                .unwrap();
         let start_logging_indicator =
             Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\sDone.+! For help, type").unwrap();
         let server_stop = Regex::new(
@@ -101,37 +103,43 @@ impl LogParser {
             death_regex: death,
             server_started: start_logging_indicator,
             server_stopping: server_stop,
-            connected_players : VMutex::new(HashSet::new())
+            connected_players: VMutex::new(HashSet::new()),
         }
     }
 
     /// Returns the [ChatMessage] type containing information about the message, and the change in player count
     /// This method is designed to have its output passed to [discord::send_minecraft_embed()]
-    pub fn try_parse_line(&self, line: String) -> Option<(ChatMessage,i32)> {
+    pub fn try_parse_line(&self, line: String) -> Option<(ChatMessage, i32)> {
         let mut log = start_logging.lock().unwrap();
         if !log.get()
             && let Some(caps) = self.server_started.captures(&line)
         {
             log.set(true);
-            return Some((ChatMessage {
-                message_type: MessageType::DEATH,
-                message_text: "Server Started".to_string(),
-                player_name: "MHF_Grass".to_string(),
-            },0));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::DEATH,
+                    message_text: "Server Started".to_string(),
+                    player_name: "MHF_Grass".to_string(),
+                },
+                0,
+            ));
         }
         if log.get()
             && let Some(caps) = self.server_stopping.captures(&line)
         {
             let mut pc = 0;
-            if let Ok(player_count) = connected_player_count.lock(){
+            if let Ok(player_count) = connected_player_count.lock() {
                 pc = player_count.get()
             }
             log.set(false);
-                return Some((ChatMessage {
-                message_type: MessageType::DEATH,
-                message_text: "Server Stopped".to_string(),
-                player_name: "MHF_Grass".to_string(),
-            },-pc));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::DEATH,
+                    message_text: "Server Stopped".to_string(),
+                    player_name: "MHF_Grass".to_string(),
+                },
+                -pc,
+            ));
         }
         if let Some(caps) = self.chat_regex.captures(&line) {
             if line
@@ -147,43 +155,61 @@ impl LogParser {
 
             let mut player_name = String::from(&caps[1]);
             let message_text = String::from(&caps[2]);
-            return Some((ChatMessage {
-                message_type: MessageType::CHAT,
-                message_text,
-                player_name,
-            },0));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::CHAT,
+                    message_text,
+                    player_name,
+                },
+                0,
+            ));
         } else if let Some(caps) = self.joined_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             let mut player_set = self.connected_players.lock().unwrap();
             player_set.insert(player_name.clone());
-            return Some((ChatMessage {
-                message_type: MessageType::JOIN,
-                message_text: format!("{} joined the game", player_name),
-                player_name,
-            },1));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::JOIN,
+                    message_text: format!("{} joined the game", player_name),
+                    player_name,
+                },
+                1,
+            ));
         } else if let Some(caps) = self.left_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             let mut player_set = self.connected_players.lock().unwrap();
             player_set.remove(&player_name.clone());
-            return Some((ChatMessage {
-                message_type: MessageType::LEAVE,
-                message_text: format!("{} left the game", player_name),
-                player_name,
-            },-1));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::LEAVE,
+                    message_text: format!("{} left the game", player_name),
+                    player_name,
+                },
+                -1,
+            ));
         } else if let Some(caps) = self.advancement_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
-            return Some((ChatMessage {
-                message_type: MessageType::ADVANCEMENT,
-                message_text: format!("{} has made the advancement {}", player_name, &caps[2]),
-                player_name,
-            },0));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::ADVANCEMENT,
+                    message_text: format!("{} has made the advancement {}", player_name, &caps[2]),
+                    player_name,
+                },
+                0,
+            ));
         } else if let Some(caps) = self.challenge_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
-            return Some((ChatMessage {
-                message_type: MessageType::CHALLENGE,
-                message_text: format!("{} has completed the challenge {}", player_name, &caps[2]),
-                player_name,
-            },0));
+            return Some((
+                ChatMessage {
+                    message_type: MessageType::CHALLENGE,
+                    message_text: format!(
+                        "{} has completed the challenge {}",
+                        player_name, &caps[2]
+                    ),
+                    player_name,
+                },
+                0,
+            ));
         } else if let Some(caps) = self.death_regex.captures(&line)
             && log.get()
             && !&caps[1].contains(":")
@@ -191,18 +217,25 @@ impl LogParser {
             let player_name = String::from(&caps[3]);
             let mut player_set = self.connected_players.lock().unwrap();
             if player_set.contains(&player_name) {
-                return Some((ChatMessage {
-                    message_type: MessageType::DEATH,
-                    message_text: caps[2].to_string(),
-                    player_name,
-                },0));
+                return Some((
+                    ChatMessage {
+                        message_type: MessageType::DEATH,
+                        message_text: caps[2].to_string(),
+                        player_name,
+                    },
+                    0,
+                ));
             }
         }
         None
     }
 }
 
-pub async fn start_server(command: &mut Command, http: &Arc<Http>) {
+pub async fn start_server(
+    command: &mut Command,
+    http: &Arc<Http>,
+    shard_manager: Arc<ShardManager>,
+) -> Result<ExitStatus, ()> {
     let mut handle = command.spawn().unwrap();
     let mut stdout = handle.stdout.take().ok_or("handle present").unwrap();
     let mut stdin = handle.stdin.take().ok_or("handle present").unwrap();
@@ -232,7 +265,7 @@ pub async fn start_server(command: &mut Command, http: &Arc<Http>) {
         println!("{}", line);
 
         if let Some((msg, should_update_status)) = chat_message {
-            if should_update_status !=0 {
+            if should_update_status != 0 {
                 if let Ok(mut connected_players) = connected_player_count.lock() {
                     connected_players.add(should_update_status);
                 }
@@ -248,4 +281,7 @@ pub async fn start_server(command: &mut Command, http: &Arc<Http>) {
     if !status.success() {
         eprintln!("Process exited with status: {}", status);
     }
+    println!("Minecraft Server Offline!");
+    shard_manager.shutdown_all().await;
+    Ok(status)
 }

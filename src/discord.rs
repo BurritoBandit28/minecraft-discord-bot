@@ -1,11 +1,15 @@
-use crate::minecraft::{chat_send_queue, connected_player_count, ChatMessage, MessageType};
+use crate::minecraft::{ChatMessage, MessageType, chat_send_queue, connected_player_count};
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
-use serenity::all::{ActivityData, ActivityType, ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor, CreateMessage, EventHandler, Http, Message, OnlineStatus, Ready};
-use serenity::async_trait;
-use std::sync::Arc;
 use serenity::all::ActivityType::Playing;
+use serenity::all::{
+    ActivityData, ActivityType, ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor,
+    CreateMessage, EventHandler, Http, Message, OnlineStatus, Ready,
+};
+use serenity::async_trait;
 use serenity::gateway::ShardMessenger;
+use std::sync::Arc;
+use tokio::net::windows::named_pipe::PipeEnd::Server;
 use tokio::sync::Mutex;
 
 lazy_static! {
@@ -64,20 +68,18 @@ pub struct MessageHandler;
 
 #[async_trait]
 impl EventHandler for MessageHandler {
-
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content.starts_with(".poop") {
-
             let builder = CreateMessage::new().content("poop poopy poop poop");
 
             msg.channel_id.send_message(&ctx.http, builder).await;
         } else {
             if !msg.author.bot {
-                if let Ok(mut channel_id_guard) = channel_id_val.try_lock()
+                if let Ok(channel_id_guard) = channel_id_val.try_lock()
                     && msg.channel_id == channel_id_guard.get()
                 {
                     let mut message_to_send = &msg.content;
-                    let mut mc_chat_message = String::new();
+                    let mc_chat_message: String;
 
                     if msg.attachments.len() > 0 {
                         mc_chat_message = format!(
@@ -98,10 +100,12 @@ impl EventHandler for MessageHandler {
                     let mut queue = chat_send_queue.lock().await;
                     queue.push(mc_chat_message);
                 }
-            }
-            else {
+            } else {
                 if let Ok(player_count) = connected_player_count.lock() {
-                    ctx.shard.set_activity(Some(ActivityData::playing(format!("{} online", player_count.get()))))
+                    ctx.shard.set_activity(Some(ActivityData::playing(format!(
+                        "{} online",
+                        player_count.get()
+                    ))))
                 }
             }
         }
