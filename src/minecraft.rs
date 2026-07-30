@@ -3,10 +3,11 @@ use crate::discord;
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
 use regex::Regex;
-use serenity::all::Http;
+use serenity::all::{Http, ShardManager};
 use std::sync::Arc;
 use std::sync::Mutex as VMutex;
 use std::time::Duration;
+use serenity::gateway::ShardMessenger;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader as TokioBufReader};
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::Mutex;
@@ -16,6 +17,7 @@ lazy_static! {
     pub static ref INSTANCE: LogParser = LogParser::new();
     pub static ref chat_send_queue: Mutex<Vec<String>> = Mutex::new(vec![]);
     pub static ref start_logging: VMutex<GetSetWrapper<bool>> = VMutex::new(GetSetWrapper::new());
+    pub static ref connected_player_count : VMutex<GetSetWrapper<i32>> = VMutex::new(GetSetWrapper::new());
 }
 
 pub struct LogParser {
@@ -60,10 +62,6 @@ impl ChatMessage {
 }
 
 impl LogParser {
-    pub fn get_chat_message(line: String) -> String {
-        let message = line.split_once(":").unwrap().1.split_once(" ").unwrap().1;
-        message.to_string()
-    }
 
     fn new() -> Self {
         // old regex \[[0-9:]+\] \[[A-Za-z0-9/_\- ]+\]: <[A-Za-z0-9_-]+>
@@ -107,28 +105,29 @@ impl LogParser {
         }
     }
 
-    // This function will be used for parsing other events, right now its just for chat messages
-    pub fn try_parse_line(&self, line: String) -> Option<ChatMessage> {
+    // Returns the chat message type to be sent as an embed, and the change in player count
+    pub fn try_parse_line(&self, line: String) -> Option<(ChatMessage,i32)> {
         let mut log = start_logging.lock().unwrap();
         if !log.get()
             && let Some(caps) = self.server_started.captures(&line)
         {
             log.set(true);
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: "Server Started".to_string(),
                 player_name: "MHF_Grass".to_string(),
-            });
+            },0));
         }
         if log.get()
             && let Some(caps) = self.server_stopping.captures(&line)
         {
+            // should probably set player count to 0 when this happens
             log.set(false);
-            return Some(ChatMessage {
+                return Some((ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: "Server Stopped".to_string(),
                 player_name: "MHF_Grass".to_string(),
-            });
+            },0));
         }
         if let Some(caps) = self.chat_regex.captures(&line) {
             if line
@@ -144,43 +143,43 @@ impl LogParser {
 
             let mut player_name = String::from(&caps[1]);
             let message_text = String::from(&caps[2]);
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::CHAT,
                 message_text,
                 player_name,
-            });
+            },0));
         } else if let Some(caps) = self.joined_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             let mut player_set = self.connected_players.lock().unwrap();
             player_set.insert(player_name.clone());
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::JOIN,
                 message_text: format!("{} joined the game", player_name),
                 player_name,
-            });
+            },1));
         } else if let Some(caps) = self.left_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
             let mut player_set = self.connected_players.lock().unwrap();
             player_set.remove(&player_name.clone());
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::LEAVE,
                 message_text: format!("{} left the game", player_name),
                 player_name,
-            });
+            },-1));
         } else if let Some(caps) = self.advancement_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::ADVANCEMENT,
                 message_text: format!("{} has made the advancement {}", player_name, &caps[2]),
                 player_name,
-            });
+            },0));
         } else if let Some(caps) = self.challenge_regex.captures(&line) {
             let player_name = String::from(&caps[1]);
-            return Some(ChatMessage {
+            return Some((ChatMessage {
                 message_type: MessageType::CHALLENGE,
                 message_text: format!("{} has completed the challenge {}", player_name, &caps[2]),
                 player_name,
-            });
+            },0));
         } else if let Some(caps) = self.death_regex.captures(&line)
             && log.get()
             && !&caps[1].contains(":")
@@ -188,11 +187,11 @@ impl LogParser {
             let player_name = String::from(&caps[3]);
             let mut player_set = self.connected_players.lock().unwrap();
             if player_set.contains(&player_name) {
-                return Some(ChatMessage {
+                return Some((ChatMessage {
                     message_type: MessageType::DEATH,
                     message_text: caps[2].to_string(),
                     player_name,
-                });
+                },0));
             }
         }
         None
@@ -228,7 +227,15 @@ pub async fn start_server(command: &mut Command, http: &Arc<Http>) {
         let chat_message = INSTANCE.try_parse_line(line.clone());
         println!("{}", line);
 
-        if let Some(msg) = chat_message {
+        if let Some((msg, should_update_status)) = chat_message {
+            if should_update_status !=0 {
+                if let Ok(mut connected_players) = connected_player_count.lock() {
+                    connected_players.add(should_update_status);
+                }
+            }
+            // the send embed function triggers the status to change, as the bot detects its own message being sent
+            // and uses that detection to update the status using the Context found in MessageHandler functions
+            // its jank but hey it works
             discord::send_minecraft_embed(http, msg).await;
         }
     }

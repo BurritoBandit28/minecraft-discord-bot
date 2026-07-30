@@ -89,8 +89,8 @@ async fn main() {
     command.stdin(Stdio::piped());
 
     let (result_one, result_two, result_three) = join!(
-        client.start(),
         start_server(&mut command, &http),
+        client.start(),
         handle_console_input()
     );
 }

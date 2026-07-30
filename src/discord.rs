@@ -1,12 +1,11 @@
-use crate::minecraft::{ChatMessage, MessageType, chat_send_queue};
+use crate::minecraft::{chat_send_queue, connected_player_count, ChatMessage, MessageType};
 use crate::util::GetSetWrapper;
 use lazy_static::lazy_static;
-use serenity::all::{
-    ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor, CreateMessage, EventHandler, Http,
-    Message, Ready,
-};
+use serenity::all::{ActivityData, ActivityType, ChannelId, Colour, Context, CreateEmbed, CreateEmbedAuthor, CreateMessage, EventHandler, Http, Message, OnlineStatus, Ready};
 use serenity::async_trait;
 use std::sync::Arc;
+use serenity::all::ActivityType::Playing;
+use serenity::gateway::ShardMessenger;
 use tokio::sync::Mutex;
 
 lazy_static! {
@@ -65,24 +64,12 @@ pub struct MessageHandler;
 
 #[async_trait]
 impl EventHandler for MessageHandler {
+
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content.starts_with(".poop") {
-            // Create the embed with your desired content
-            let embed = CreateEmbed::new()
-                .title("This is an embed")
-                .description("With a description");
 
-            let embed_author = CreateEmbedAuthor::new("Burrito_Bandit28").icon_url(format!(
-                "https://mc-api.io/render/face/{}/java",
-                "Burrito_Bandit28"
-            ));
+            let builder = CreateMessage::new().content("poop poopy poop poop");
 
-            let embed = embed.author(embed_author);
-
-            // Create the message builder and add the embed
-            let builder = CreateMessage::new().content("test").embed(embed);
-
-            // Send the message
             msg.channel_id.send_message(&ctx.http, builder).await;
         } else {
             if !msg.author.bot {
@@ -110,6 +97,11 @@ impl EventHandler for MessageHandler {
                     }
                     let mut queue = chat_send_queue.lock().await;
                     queue.push(mc_chat_message);
+                }
+            }
+            else {
+                if let Ok(player_count) = connected_player_count.lock() {
+                    ctx.shard.set_activity(Some(ActivityData::playing(format!("{} online", player_count.get()))))
                 }
             }
         }
