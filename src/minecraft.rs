@@ -105,7 +105,8 @@ impl LogParser {
         }
     }
 
-    // Returns the chat message type to be sent as an embed, and the change in player count
+    /// Returns the [ChatMessage] type containing information about the message, and the change in player count
+    /// This method is designed to have its output passed to [discord::send_minecraft_embed()]
     pub fn try_parse_line(&self, line: String) -> Option<(ChatMessage,i32)> {
         let mut log = start_logging.lock().unwrap();
         if !log.get()
@@ -121,13 +122,16 @@ impl LogParser {
         if log.get()
             && let Some(caps) = self.server_stopping.captures(&line)
         {
-            // should probably set player count to 0 when this happens
+            let mut pc = 0;
+            if let Ok(player_count) = connected_player_count.lock(){
+                pc = player_count.get()
+            }
             log.set(false);
                 return Some((ChatMessage {
                 message_type: MessageType::DEATH,
                 message_text: "Server Stopped".to_string(),
                 player_name: "MHF_Grass".to_string(),
-            },0));
+            },-pc));
         }
         if let Some(caps) = self.chat_regex.captures(&line) {
             if line
