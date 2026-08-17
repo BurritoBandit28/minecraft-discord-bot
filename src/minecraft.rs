@@ -74,9 +74,9 @@ impl LogParser {
         //idk
         let chat = Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*<([^>]+)> (.+)").unwrap();
         let challenge =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*challenge ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*has completed the challenge ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
         let advancement =
-            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*advancement ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
+            Regex::new(r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s*\<([A-Za-z-0-9_\-]+).*has made the advancement ([\[A-Za-z 0-9_\-!.\]]+)").unwrap();
         let joined_game = Regex::new(
             r"^\[[^\]]+\]\s*\[Server thread/INFO\].+\s([A-Za-z-0-9_\-]+) joined the game",
         )
