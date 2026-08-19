@@ -1,3 +1,4 @@
+[19:12:50] [Server thread/INFO]: Done (2.523s)! For help, type "help"
 [16:09:52] [Server thread/INFO]: Burrito_Bandit28 joined the game
 [16:10:35] [Server thread/INFO]: Burrito_Bandit28 has made the advancement [Monster Hunter]
 [16:10:58] [Server thread/INFO]: Burrito_Bandit28 has completed the challenge [Hot Tourist Destinations]
@@ -8,3 +9,4 @@
 [16:31:07] [Server thread/INFO]: [Burrito_Bandit28] challenge
 [16:34:15] [Server thread/INFO]: Burrito_Bandit28 was killed by [Intentional Game Design]
 [16:13:06] [Server thread/INFO]: Burrito_Bandit28 left the game
+[12:00:24.139] [Server thread/INFO]: Stopping server
